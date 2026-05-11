@@ -6,82 +6,155 @@
     <title>明新資教盤點系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .active-btn:active { transform: scale(0.9); }
+        [v-cloak] { display: none; }
+    </style>
 </head>
 <body class="bg-slate-100 min-h-screen pb-10">
-    <div id="app" class="max-w-md mx-auto px-4">
+    <div id="app" v-cloak class="max-w-md mx-auto px-4">
         <header class="py-6 text-center relative">
             <h1 class="text-2xl font-bold text-slate-800">明新資教盤點系統</h1>
-            <button @click="fetchData" class="absolute right-0 top-5 p-4 text-blue-600 z-50">
+            <p class="text-sm text-slate-500 mt-1">即時同步 Google Sheets 數據</p>
+            
+            <button @click="fetchData" class="absolute right-0 top-5 p-4 text-blue-600 active:rotate-180 transition-all z-50">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
             </button>
         </header>
 
-        <div v-if="loading" class="text-center py-20 italic text-slate-500">讀取雲端即時資料中...</div>
+        <div class="mb-6 sticky top-2 z-40">
+            <input v-model="searchQuery" type="text" placeholder="搜尋測驗名稱..." 
+                class="w-full p-4 rounded-2xl border-none shadow-lg focus:ring-2 focus:ring-blue-500 outline-none text-lg">
+        </div>
 
-        <div v-else class="space-y-4">
-            <div v-for="(item, index) in items" :key="index" class="bg-white rounded-2xl shadow-sm border p-4">
-                <div class="h-40 bg-white mb-2"><img :src="item['圖片 (網址)'] || item['圖片']" class="w-full h-full object-contain"></div>
-                <h2 class="text-lg font-bold">{{ item['物品名稱'] }}</h2>
-                <div class="flex items-center justify-between bg-slate-50 p-4 rounded-xl mt-4">
-                    <span class="font-bold">消耗品份數</span>
-                    <div class="flex items-center gap-4">
-                        <button @click="updateStock(item, -1)" class="w-10 h-10 bg-white border rounded-full text-2xl">-</button>
-                        <span class="text-2xl font-black text-blue-600">{{ item['消耗品份數'] }}</span>
-                        <button @click="updateStock(item, 1)" class="w-10 h-10 bg-blue-600 text-white rounded-full text-2xl">+</button>
+        <div v-if="loading" class="text-center py-20">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mb-2"></div>
+            <p class="text-slate-500 font-medium">讀取最新庫存中...</p>
+        </div>
+
+        <div v-else class="space-y-6">
+            <div v-for="(item, index) in filteredItems" :key="index" class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                
+                <div class="h-48 bg-white border-b border-slate-100 p-2">
+                    <img :src="getImage(item)" class="w-full h-full object-contain">
+                </div>
+
+                <div class="p-5">
+                    <h2 class="text-xl font-bold text-slate-800 leading-tight mb-3">{{ getVal(item, '測驗名稱') }}</h2>
+                    
+                    <div class="flex flex-wrap gap-2 mb-5">
+                        <span class="text-xs font-bold bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg">
+                            🏷️ {{ getVal(item, '類別') || '未分類' }}
+                        </span>
+                        <span class="text-xs font-bold bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg">
+                            📍 {{ getVal(item, '存放位置') || '未標註' }}
+                        </span>
+                    </div>
+
+                    <div class="flex items-center justify-between bg-slate-50 p-4 rounded-2xl shadow-inner border border-slate-100">
+                        <span class="font-bold text-slate-700">消耗品份數</span>
+                        <div class="flex items-center gap-5">
+                            <button @click="updateStock(item, -1)" class="active-btn w-12 h-12 bg-white border border-slate-300 rounded-full shadow-sm flex items-center justify-center text-3xl font-light text-slate-600">-</button>
+                            <span class="text-3xl font-black text-blue-600 min-w-[40px] text-center">{{ getVal(item, '消耗品份數') || 0 }}</span>
+                            <button @click="updateStock(item, 1)" class="active-btn w-12 h-12 bg-blue-600 rounded-full shadow-sm flex items-center justify-center text-3xl font-light text-white">+</button>
+                        </div>
+                    </div>
+                    
+                    <div class="h-8 flex items-center justify-center mt-2">
+                        <p v-if="item.syncing" class="text-sm font-bold text-orange-500 animate-pulse">⏳ 同步中...</p>
+                        <p v-else-if="item.success" class="text-sm font-bold text-green-500">✅ 雲端已更新</p>
                     </div>
                 </div>
-                <div class="h-6 mt-2 text-center">
-                    <p v-if="item.syncing" class="text-xs text-orange-500 animate-pulse font-bold">同步中...</p>
-                    <p v-else-if="item.success" class="text-xs text-green-500 font-bold">✅ 已同步</p>
-                </div>
+            </div>
+            
+            <div v-if="filteredItems.length === 0" class="text-center py-10 text-slate-400">
+                找不到相關測驗工具...
             </div>
         </div>
     </div>
 
     <script>
-        // ⚠️ 請確保這是你最新部署的 Apps Script 網址
+        // 請確保 SCRIPT_URL 是您最新部署的版本
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw_svkBBn5EJg9A4Btd78uUzZ7sjO4Z1OlZ-Sxs4JPaAkIC-JRnq4UcxKIXfZGLHDI/exec';
 
-        const { createApp, ref, onMounted } = Vue;
+        const { createApp, ref, computed, onMounted } = Vue;
         createApp({
             setup() {
                 const items = ref([]);
                 const loading = ref(true);
+                const searchQuery = ref('');
+
+                // 通用的欄位抓取方法
+                const getVal = (item, key) => {
+                    const foundKey = Object.keys(item).find(k => k.trim().includes(key));
+                    return foundKey ? item[foundKey] : '';
+                };
+
+                const getImage = (item) => {
+                    const url = getVal(item, '圖片');
+                    return (url && String(url).startsWith('http')) ? url : 'https://via.placeholder.com/400x300?text=No+Image';
+                };
 
                 const fetchData = async () => {
                     loading.value = true;
                     try {
-                        // 直接向 Apps Script 請求 JSON 資料（繞過 Google CSV 快取）
                         const resp = await fetch(SCRIPT_URL);
                         const data = await resp.json();
-                        items.value = data.map(i => ({ ...i, syncing: false, success: false }));
-                    } catch (e) { alert("讀取失敗，請確認 Apps Script 已部署為『所有人』"); }
+                        // 過濾掉全空的列
+                        items.value = data
+                            .filter(row => getVal(row, '測驗名稱'))
+                            .map(i => ({ ...i, syncing: false, success: false }));
+                    } catch (e) {
+                        console.error(e);
+                        alert("讀取失敗，請確認網路連線或 Apps Script 設定。");
+                    }
                     loading.value = false;
                 };
 
+                // 搜尋過濾邏輯
+                const filteredItems = computed(() => {
+                    const q = searchQuery.value.toLowerCase().trim();
+                    return items.value.filter(item => 
+                        getVal(item, '測驗名稱').toLowerCase().includes(q)
+                    );
+                });
+
                 const updateStock = async (item, change) => {
-                    let newNum = parseInt(item['消耗品份數']) + change;
+                    const stockKey = Object.keys(item).find(k => k.includes('消耗品份數'));
+                    if (!stockKey) return;
+
+                    let currentNum = parseInt(item[stockKey]) || 0;
+                    const newNum = currentNum + change;
                     if (newNum < 0) return;
-                    
-                    item['消耗品份數'] = newNum;
+
+                    item[stockKey] = newNum;
                     item.syncing = true;
                     item.success = false;
 
-                    await fetch(SCRIPT_URL, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        body: JSON.stringify({ name: item['物品名稱'], newStock: newNum })
-                    });
-
-                    item.syncing = false;
-                    item.success = true;
-                    setTimeout(() => { item.success = false; }, 3000);
+                    try {
+                        await fetch(SCRIPT_URL, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            body: JSON.stringify({ 
+                                name: getVal(item, '測驗名稱'), 
+                                newStock: newNum 
+                            })
+                        });
+                        item.syncing = false;
+                        item.success = true;
+                        setTimeout(() => { item.success = false; }, 3000);
+                    } catch (e) {
+                        item.syncing = false;
+                        alert("更新失敗！");
+                    }
                 };
 
                 onMounted(fetchData);
-                return { items, loading, updateStock, fetchData };
+                return { items, loading, searchQuery, filteredItems, getVal, getImage, updateStock, fetchData };
             }
         }).mount('#app');
     </script>
