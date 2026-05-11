@@ -15,10 +15,16 @@
 </head>
 <body class="bg-slate-100 min-h-screen pb-10">
     <div id="app" class="max-w-md mx-auto px-4">
-        <header class="py-6 text-center">
-            <h1 class="text-2xl font-bold text-slate-800">明新資教盤點系統</h1>
-            <p class="text-sm text-slate-500 mt-1">即時同步 Google Sheets 庫存資料</p>
-        </header>
+        <header class="py-6 text-center relative">
+    <h1 class="text-2xl font-bold text-slate-800">明新資教盤點系統</h1>
+    <p class="text-sm text-slate-500 mt-1">即時同步 Google Sheets 庫存資料</p>
+    
+    <button @click="refreshData" class="absolute right-0 top-6 p-2 text-blue-600 active:rotate-180 transition-all">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+    </button>
+</header>
 
         <div class="mb-4">
             <input v-model="searchQuery" type="text" placeholder="搜尋物品名稱..." class="w-full p-3 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-lg">
@@ -76,14 +82,26 @@
                 };
 
                 const fetchData = () => {
-                    Papa.parse(CSV_URL, {
-                        download: true, header: true, skipEmptyLines: true,
-                        complete: (r) => {
-                            items.value = r.data.filter(row => Object.values(row).some(v => v)).map(row => ({...row, syncing: false}));
-                            loading.value = false;
-                        }
-                    });
-                };
+    // 在網址後加上隨機參數 ?t=時間戳記，強制繞過快取
+    const timestamp = new Date().getTime();
+    const freshCsvUrl = `${CSV_URL}&t=${timestamp}`;
+    const refreshData = () => {
+    loading.value = true;
+    fetchData();
+};
+                    
+    Papa.parse(freshCsvUrl, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: (r) => {
+            items.value = r.data
+                .filter(row => Object.values(row).some(v => v && v.trim() !== ""))
+                .map(row => ({ ...row, syncing: false }));
+            loading.value = false;
+        }
+    });
+};
 
                 const filteredItems = computed(() => items.value.filter(i => getVal(i, '測驗名稱').toLowerCase().includes(searchQuery.value.toLowerCase())));
 
