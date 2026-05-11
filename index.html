@@ -9,52 +9,61 @@
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
-        body { font-family: 'Noto Sans TC', sans-serif; }
+        body { font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
         .active-btn:active { transform: scale(0.9); }
+        [v-cloak] { display: none; }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen pb-10">
-    <div id="app" class="max-w-md mx-auto px-4">
+    <div id="app" v-cloak class="max-w-md mx-auto px-4">
         <header class="py-6 text-center relative">
-    <h1 class="text-2xl font-bold text-slate-800">明新資教盤點系統</h1>
-    <p class="text-sm text-slate-500 mt-1">即時同步 Google Sheets 庫存資料</p>
-    
-    <button @click="refreshData" class="absolute right-0 top-6 p-2 text-blue-600 active:rotate-180 transition-all">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-    </button>
-</header>
+            <h1 class="text-2xl font-bold text-slate-800">明新資教盤點系統</h1>
+            <p class="text-sm text-slate-500 mt-1">即時同步 Google Sheets 庫存資料</p>
+            
+            <button @click="refreshData" class="absolute right-0 top-5 p-4 text-blue-600 active:rotate-180 transition-all z-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+            </button>
+        </header>
 
         <div class="mb-4">
-            <input v-model="searchQuery" type="text" placeholder="搜尋物品名稱..." class="w-full p-3 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-lg">
+            <input v-model="searchQuery" type="text" placeholder="搜尋測驗名稱..." class="w-full p-3 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-lg">
         </div>
 
-        <div v-if="loading" class="text-center py-20">同步中...</div>
+        <div v-if="loading" class="text-center py-20">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mb-2"></div>
+            <p class="text-slate-500 font-medium">更新雲端資料中...</p>
+        </div>
 
         <div v-else class="space-y-4">
             <div v-for="(item, index) in filteredItems" :key="index" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div class="h-48 bg-white p-2">
+                <div class="h-48 bg-white border-b border-slate-100 p-2">
                     <img :src="getImage(item)" class="w-full h-full object-contain">
                 </div>
 
                 <div class="p-4">
-                    <h2 class="text-lg font-bold text-slate-800 mb-2">{{ getVal(item, '測驗名稱') }}</h2>
+                    <h2 class="text-lg font-bold text-slate-800 leading-tight mb-2">{{ getVal(item, '測驗名稱') }}</h2>
                     
                     <div class="flex flex-wrap gap-2 mb-4 text-xs">
                         <span class="bg-blue-50 text-blue-600 px-2 py-1 rounded">類別：{{ getVal(item, '類別') }}</span>
-                        <span class="bg-slate-100 text-slate-500 px-2 py-1 rounded">位置：{{ getVal(item, '存放位置') }}</span>
+                        <span class="bg-slate-100 text-slate-500 px-2 py-1 rounded">📍 {{ getVal(item, '存放位置') }}</span>
                     </div>
 
-                    <div class="flex items-center justify-between bg-slate-50 p-4 rounded-xl">
-                        <span class="font-bold text-slate-700">消耗品份數</span>
+                    <div class="flex items-center justify-between bg-slate-50 p-4 rounded-xl shadow-inner">
+                        <span class="font-bold text-slate-700">消耗品剩餘</span>
                         <div class="flex items-center gap-4">
-                            <button @click="updateStock(item, -1)" class="active-btn w-10 h-10 bg-white border border-slate-300 rounded-full flex items-center justify-center text-2xl">-</button>
-                            <span class="text-2xl font-black text-blue-600 w-10 text-center">{{ getVal(item, '消耗品份數') || 0 }}</span>
-                            <button @click="updateStock(item, 1)" class="active-btn w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center text-2xl">+</button>
+                            <button @click="updateStock(item, -1)" class="active-btn w-12 h-12 bg-white border border-slate-300 rounded-full shadow-sm flex items-center justify-center text-2xl font-bold text-slate-600">-</button>
+                            <span class="text-2xl font-black text-blue-600 min-w-[40px] text-center">{{ getVal(item, '消耗品份數') || 0 }}</span>
+                            <button @click="updateStock(item, 1)" class="active-btn w-12 h-12 bg-blue-600 rounded-full shadow-sm flex items-center justify-center text-2xl font-bold text-white">+</button>
                         </div>
                     </div>
-                    <p v-if="item.syncing" class="text-[10px] text-center mt-2 text-orange-500 animate-pulse">雲端更新中...</p>
+                    
+                    <div class="h-8 flex items-center justify-center mt-2">
+                        <p v-if="item.syncing" class="text-sm font-bold text-orange-500 animate-pulse">⏳ 正在同步至雲端...</p>
+                        <p v-else-if="item.syncSuccess" class="text-sm font-bold text-green-500">✅ 已與雲端同步</p>
+                        <p v-else class="text-[10px] text-slate-300 italic">目前為雲端資料</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -72,8 +81,8 @@
                 const searchQuery = ref('');
 
                 const getVal = (item, key) => {
-                    const found = Object.keys(item).find(k => k.trim().includes(key));
-                    return found ? item[found] : '';
+                    const foundKey = Object.keys(item).find(k => k.trim().includes(key));
+                    return foundKey ? item[foundKey] : '';
                 };
 
                 const getImage = (item) => {
@@ -82,53 +91,72 @@
                 };
 
                 const fetchData = () => {
-    // 在網址後加上隨機參數 ?t=時間戳記，強制繞過快取
-    const timestamp = new Date().getTime();
-    const freshCsvUrl = `${CSV_URL}&t=${timestamp}`;
-    const refreshData = () => {
-    loading.value = true;
-    fetchData();
-};
-                    
-    Papa.parse(freshCsvUrl, {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        complete: (r) => {
-            items.value = r.data
-                .filter(row => Object.values(row).some(v => v && v.trim() !== ""))
-                .map(row => ({ ...row, syncing: false }));
-            loading.value = false;
-        }
-    });
-};
+                    // 核心修正：強制在 URL 後面加隨機參數，繞過 Google 快取
+                    const nocache = `&t=${new Date().getTime()}`;
+                    Papa.parse(CSV_URL + nocache, {
+                        download: true,
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: (r) => {
+                            items.value = r.data
+                                .filter(row => Object.values(row).some(v => v && v.trim() !== ""))
+                                .map(row => ({ ...row, syncing: false, syncSuccess: false }));
+                            loading.value = false;
+                        }
+                    });
+                };
 
-                const filteredItems = computed(() => items.value.filter(i => getVal(i, '測驗名稱').toLowerCase().includes(searchQuery.value.toLowerCase())));
+                const refreshData = () => {
+                    loading.value = true;
+                    fetchData();
+                };
+
+                const filteredItems = computed(() => {
+                    const q = searchQuery.value.toLowerCase().trim();
+                    if (!q) return items.value;
+                    return items.value.filter(item => getVal(item, '測驗名稱').toLowerCase().includes(q));
+                });
 
                 const updateStock = async (item, change) => {
                     const stockKey = Object.keys(item).find(k => k.includes('消耗品份數'));
                     if (!stockKey) return;
 
-                    let newNum = (parseInt(item[stockKey]) || 0) + change;
+                    let currentNum = parseInt(item[stockKey]) || 0;
+                    const newNum = currentNum + change;
                     if (newNum < 0) return;
 
+                    // 1. UI 立即反應
                     item[stockKey] = newNum;
                     item.syncing = true;
+                    item.syncSuccess = false;
 
                     try {
+                        // 2. 發送 POST 請求
                         await fetch(SCRIPT_URL, {
                             method: 'POST',
-                            mode: 'no-cors',
-                            body: JSON.stringify({ name: getVal(item, '測驗名稱'), newStock: newNum })
+                            mode: 'no-cors', 
+                            body: JSON.stringify({ 
+                                name: getVal(item, '測驗名稱'), 
+                                newStock: newNum 
+                            })
                         });
-                        setTimeout(() => { item.syncing = false; }, 800);
-                    } catch (e) {
+                        
+                        // 3. 請求完成後強制停留顯示「已與雲端同步」
                         item.syncing = false;
+                        item.syncSuccess = true;
+                        
+                        // 4秒後恢復一般狀態
+                        setTimeout(() => { item.syncSuccess = false; }, 4000);
+
+                    } catch (e) {
+                        console.error("Sync Failed", e);
+                        item.syncing = false;
+                        alert("同步失敗，請檢查網路！");
                     }
                 };
 
                 onMounted(fetchData);
-                return { loading, searchQuery, filteredItems, getVal, getImage, updateStock };
+                return { items, loading, searchQuery, filteredItems, getVal, getImage, updateStock, refreshData };
             }
         }).mount('#app');
     </script>
