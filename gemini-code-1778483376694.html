@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>明新資教 - 快速盤點系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .active-btn:active { transform: scale(0.9); }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen pb-10">
+    <div id="app" class="max-w-md mx-auto px-4">
+        <header class="py-6 text-center">
+            <h1 class="text-2xl font-bold text-slate-800">測驗工具盤點系統</h1>
+            <p class="text-sm text-slate-500 mt-1">點擊 + / - 即可同步更新至 Google Sheets</p>
+        </header>
+
+        <div class="mb-4">
+            <input v-model="searchQuery" type="text" placeholder="搜尋測驗名稱..." class="w-full p-3 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-lg">
+        </div>
+
+        <div v-if="loading" class="text-center py-20">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mb-2"></div>
+            <p class="text-slate-500">正在讀取最新資料...</p>
+        </div>
+
+        <div v-else class="space-y-4">
+            <div v-for="(item, index) in filteredItems" :key="index" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                
+                <div class="h-48 bg-white border-b border-slate-100 p-2">
+                    <img :src="getImage(item)" class="w-full h-full object-contain">
+                </div>
+
+                <div class="p-4">
+                    <h2 class="text-lg font-bold text-slate-800 leading-tight mb-2">{{ getVal(item, '測驗名稱') }}</h2>
+                    
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <span class="text-xs font-medium bg-blue-50 text-blue-600 px-2 py-1 rounded">{{ getVal(item, '類別') }}</span>
+                        <span class="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-1 rounded">📍 {{ getVal(item, '存放位置') }}</span>
+                    </div>
+
+                    <div class="flex items-center justify-between bg-slate-50 p-4 rounded-xl shadow-inner">
+                        <span class="font-bold text-slate-700">消耗品剩餘</span>
+                        <div class="flex items-center gap-4">
+                            <button @click="updateStock(item, -1)" class="active-btn w-10 h-10 bg-white border border-slate-300 rounded-full shadow-sm flex items-center justify-center text-2xl font-bold text-slate-600">-</button>
+                            <span class="text-2xl font-black text-blue-600 min-w-[30px] text-center">{{ getVal(item, '消耗品份數') || 0 }}</span>
+                            <button @click="updateStock(item, 1)" class="active-btn w-10 h-10 bg-blue-600 rounded-full shadow-sm flex items-center justify-center text-2xl font-bold text-white">+</button>
+                        </div>
+                    </div>
+                    
+                    <p v-if="item.syncing" class="text-[10px] text-center mt-2 text-orange-500 animate-pulse font-bold">雲端同步中...</p>
+                    <p v-else class="text-[10px] text-center mt-2 text-slate-300 italic">已與雲端同步</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 更新為你提供的新連結
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRvSMIJqbvq0lYSLnEghXcDSpWbTg3TxqTdFyh5RoWbih2eOwITfG0k_k6nKKDgs9hrU0ykw3ZlGC3e/pub?output=csv';
+        // 沿用之前的 Apps Script 網址
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw_svkBBn5EJg9A4Btd78uUzZ7sjO4Z1OlZ-Sxs4JPaAkIC-JRnq4UcxKIXfZGLHDI/exec';
+
+        const { createApp, ref, computed, onMounted } = Vue;
+        createApp({
+            setup() {
+                const items = ref([]);
+                const loading = ref(true);
+                const searchQuery = ref('');
+
+                // 彈性讀取欄位內容
+                const getVal = (item, key) => {
+                    const foundKey = Object.keys(item).find(k => k.trim().includes(key));
+                    return foundKey ? item[foundKey] : '';
+                };
+
+                const getImage = (item) => {
+                    const url = getVal(item, '圖片');
+                    return (url && url.startsWith('http')) ? url : 'https://via.placeholder.com/400x300?text=No+Image';
+                };
+
+                const fetchData = () => {
+                    Papa.parse(CSV_URL, {
+                        download: true,
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: (r) => {
+                            // 過濾掉空行並加入同步狀態標籤
+                            items.value = r.data
+                                .filter(row => Object.values(row).some(v => v && v.trim() !== ""))
+                                .map(row => ({ ...row, syncing: false }));
+                            loading.value = false;
+                        }
+                    });
+                };
+
+                const filteredItems = computed(() => {
+                    const q = searchQuery.value.toLowerCase().trim();
+                    if (!q) return items.value;
+                    return items.value.filter(item => getVal(item, '測驗名稱').toLowerCase().includes(q));
+                });
+
+                const updateStock = async (item, change) => {
+                    const stockKey = Object.keys(item).find(k => k.includes('消耗品份數'));
+                    if (!stockKey) return;
+
+                    let currentNum = parseInt(item[stockKey]) || 0;
+                    const newNum = currentNum + change;
+                    if (newNum < 0) return;
+
+                    // 1. 立即更新 UI 以利快速操作
+                    item[stockKey] = newNum;
+                    item.syncing = true;
+
+                    // 2. 發送寫入請求到 Google Sheets (Apps Script)
+                    try {
+                        await fetch(SCRIPT_URL, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            body: JSON.stringify({ 
+                                name: getVal(item, '測驗名稱'), 
+                                newStock: newNum 
+                            })
+                        });
+                        // 稍微延遲移除同步字樣，讓使用者感覺到動作已完成
+                        setTimeout(() => { item.syncing = false; }, 600);
+                    } catch (e) {
+                        console.error("同步失敗:", e);
+                        item.syncing = false;
+                    }
+                };
+
+                onMounted(fetchData);
+                return { items, loading, searchQuery, filteredItems, getVal, getImage, updateStock };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
