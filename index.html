@@ -27,7 +27,7 @@
         </header>
 
         <div class="mb-6 sticky top-2 z-40">
-            <input v-model="searchQuery" type="text" placeholder="搜尋測驗名稱..." 
+            <input v-model="searchQuery" type="text" placeholder="搜尋物品名稱..." 
                 class="w-full p-4 rounded-2xl border-none shadow-lg focus:ring-2 focus:ring-blue-500 outline-none text-lg">
         </div>
 
@@ -44,7 +44,7 @@
                 </div>
 
                 <div class="p-5">
-                    <h2 class="text-xl font-bold text-slate-800 leading-tight mb-3">{{ getVal(item, '測驗名稱') }}</h2>
+                    <h2 class="text-xl font-bold text-slate-800 leading-tight mb-3">{{ getVal(item, '物品名稱') }}</h2>
                     
                     <div class="flex flex-wrap gap-2 mb-5">
                         <span class="text-xs font-bold bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg">
@@ -72,7 +72,7 @@
             </div>
             
             <div v-if="filteredItems.length === 0" class="text-center py-10 text-slate-400">
-                找不到相關測驗工具...
+                找不到相關物品工具...
             </div>
         </div>
     </div>
@@ -106,7 +106,7 @@
                         const data = await resp.json();
                         // 過濾掉全空的列
                         items.value = data
-                            .filter(row => getVal(row, '測驗名稱'))
+                            .filter(row => getVal(row, '物品名稱'))
                             .map(i => ({ ...i, syncing: false, success: false }));
                     } catch (e) {
                         console.error(e);
@@ -119,7 +119,7 @@
                 const filteredItems = computed(() => {
                     const q = searchQuery.value.toLowerCase().trim();
                     return items.value.filter(item => 
-                        getVal(item, '測驗名稱').toLowerCase().includes(q)
+                        getVal(item, '物品名稱').toLowerCase().includes(q)
                     );
                 });
 
@@ -140,7 +140,7 @@
                             method: 'POST',
                             mode: 'no-cors',
                             body: JSON.stringify({ 
-                                name: getVal(item, '測驗名稱'), 
+                                name: getVal(item, '物品名稱'), 
                                 newStock: newNum 
                             })
                         });
